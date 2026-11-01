@@ -2278,17 +2278,14 @@ function injectStyles() {
         .cii-settings .cii-title-text {
             display: inline-block;
             font-weight: 800;
-            background: linear-gradient(105deg, #ed6ca9 0%, #ffd8e9 26%, #f27db6 48%, #fff0f7 58%, #e96aa9 76%, #ffb7d5 100%);
-            background-size: 240% 100%;
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            filter: drop-shadow(0 1px 3px rgba(240, 107, 168, .38));
-            animation: cii-title-shimmer 4s ease-in-out infinite;
+            color: #ed68a8 !important;
+            -webkit-text-fill-color: #ed68a8;
+            text-shadow: 0 0 4px rgba(255, 183, 213, .75), 0 0 10px rgba(240, 107, 168, .42);
+            animation: cii-title-glow 2.8s ease-in-out infinite;
         }
-        @keyframes cii-title-shimmer {
-            0%, 100% { background-position: 100% 50%; }
-            50% { background-position: 0% 50%; }
+        @keyframes cii-title-glow {
+            0%, 100% { text-shadow: 0 0 3px rgba(255, 183, 213, .58), 0 0 7px rgba(240, 107, 168, .3); }
+            50% { text-shadow: 0 0 6px rgba(255, 205, 227, .95), 0 0 14px rgba(240, 107, 168, .62); }
         }
         .cii-settings .cii-card {
             background: linear-gradient(135deg,
