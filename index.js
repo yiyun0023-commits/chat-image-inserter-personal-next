@@ -1740,7 +1740,7 @@ function buildSettingsHtml() {
         <div id="cii-settings" class="cii-settings">
             <div class="inline-drawer">
                 <div class="inline-drawer-toggle inline-drawer-header">
-                    <b><i class="fa-solid fa-wand-magic-sparkles cii-accent-icon"></i> 文字插图 <span class="cii-en-title">Chat Image Inserter</span></b>
+                    <b><i class="fa-solid fa-wand-magic-sparkles cii-accent-icon"></i> 正文插图</b>
                     <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
                 </div>
                 <div class="inline-drawer-content">
