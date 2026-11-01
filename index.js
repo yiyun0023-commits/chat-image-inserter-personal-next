@@ -2210,8 +2210,9 @@ function bindEvents() {
 /* ================= 样式 ================= */
 
 function injectStyles() {
-    if (document.getElementById('cii-styles')) return;
-    const style = document.createElement('style');
+    // Extension hot reloads can keep the old style element in the page.
+    // Reuse it and replace its contents so updated UI styles take effect immediately.
+    const style = document.getElementById('cii-styles') || document.createElement('style');
     style.id = 'cii-styles';
     style.textContent = `
         .cii-settings {
@@ -2926,7 +2927,7 @@ function injectStyles() {
             content: attr(data-text);
         }
     `;
-    document.head.appendChild(style);
+    if (!style.isConnected) document.head.appendChild(style);
 }
 
 /* ================= 初始化 ================= */
