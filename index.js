@@ -2776,6 +2776,103 @@ function injectStyles() {
 
         .cii-settings .cii-rule.cii-uploading { opacity: 0.55; pointer-events: none; }
 
+        /* ============ 插件设置面板：轻柔的画册风格 ============ */
+        #cii-settings .inline-drawer-header {
+            min-height: 48px;
+            padding: 10px 14px;
+            border: 1px solid var(--cii-border);
+            border-radius: 16px;
+            background: linear-gradient(110deg, rgba(255, 183, 213, 0.15), rgba(196, 167, 255, 0.12));
+            box-shadow: 0 4px 18px rgba(160, 120, 170, 0.10), inset 0 1px rgba(255,255,255,.35);
+        }
+        #cii-settings .inline-drawer-header b {
+            font-size: 1.03em;
+            letter-spacing: .35px;
+        }
+        #cii-settings .cii-en-title {
+            font-weight: 500;
+            letter-spacing: .55px;
+        }
+        #cii-settings .inline-drawer-content { padding-top: 6px; }
+        #cii-settings .cii-card {
+            padding: 15px 16px;
+            margin: 12px 0;
+            border-width: 1px;
+            border-radius: 16px;
+            box-shadow: 0 5px 18px rgba(120, 90, 130, .07), inset 0 1px rgba(255,255,255,.22);
+            transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+        }
+        #cii-settings .cii-card:hover {
+            border-color: var(--cii-border-hover);
+            box-shadow: 0 8px 24px rgba(170, 110, 155, .11), inset 0 1px rgba(255,255,255,.28);
+        }
+        #cii-settings .cii-card-title {
+            gap: 9px;
+            margin-bottom: 13px;
+            padding-bottom: 9px;
+            border-bottom: 1px solid rgba(255, 183, 213, .18);
+            font-size: .98em;
+        }
+        #cii-settings .cii-emoji {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 27px;
+            height: 27px;
+            border-radius: 9px;
+            background: linear-gradient(140deg, rgba(255,183,213,.24), rgba(196,167,255,.2));
+            filter: none;
+        }
+        #cii-settings .cii-row { gap: 10px; }
+        #cii-settings .cii-inline-label { font-size: .84em; }
+        #cii-settings .cii-num { min-height: 34px; text-align: center; }
+        #cii-settings textarea.text_pole { line-height: 1.55; padding: 8px 10px; }
+        #cii-settings .cii-btn {
+            min-height: 36px;
+            padding: 8px 14px;
+            border-width: 1px;
+            border-radius: 10px;
+            font-weight: 600;
+            letter-spacing: .1px;
+        }
+        #cii-settings .cii-btn-primary {
+            background: linear-gradient(120deg, #f29abe 0%, #b99bea 100%);
+            box-shadow: 0 4px 12px rgba(205, 130, 180, .22);
+        }
+        #cii-settings .cii-btn-primary:hover { box-shadow: 0 6px 16px rgba(205, 130, 180, .32); }
+        #cii-settings .cii-stat-row { gap: 10px; }
+        #cii-settings .cii-stat {
+            min-width: 105px;
+            padding: 9px 13px;
+            border: 1px solid rgba(255, 183, 213, .24);
+            border-radius: 12px;
+            background: linear-gradient(135deg, rgba(255,183,213,.09), rgba(196,167,255,.08));
+        }
+        #cii-settings .cii-stat-value { font-size: 1.18em; }
+        #cii-settings .cii-tiny { margin-top: 9px; line-height: 1.65; }
+        #cii-settings .cii-card-rules { padding-bottom: 14px; }
+        #cii-settings .cii-rule, #cii-settings .cii-group { border-width: 1px; }
+        #cii-settings .cii-rule { border-radius: 12px; }
+        #cii-settings .cii-rule-head { min-height: 45px; padding: 8px 11px; }
+        #cii-settings .cii-rule-body { padding: 10px 12px 12px; }
+        #cii-settings .cii-image-item, #cii-settings .cii-image-add {
+            width: 78px;
+            height: 78px;
+            border-radius: 12px;
+        }
+        #cii-settings .cii-image-item { box-shadow: 0 2px 8px rgba(35, 20, 40, .10); }
+        #cii-settings .cii-image-add { background: linear-gradient(145deg, rgba(255,183,213,.08), rgba(196,167,255,.08)); }
+        #cii-settings .cii-actions-row { gap: 10px; margin-top: 12px; }
+        @media (max-width: 640px) {
+            #cii-settings .cii-card { padding: 12px; }
+            #cii-settings .cii-spacer { display: none; }
+            #cii-settings .cii-stat-row { gap: 8px; }
+            #cii-settings .cii-stat { min-width: 88px; flex: 1; }
+            #cii-settings .cii-actions-row { flex-direction: column; }
+            #cii-settings .cii-btn { justify-content: center; }
+            #cii-settings .cii-tiny-inline { display: none; }
+        }
+
         /* ============ 聊天里插入的图片（支持多图切换） ============ */
         .cii-img-block {
             position: relative;
