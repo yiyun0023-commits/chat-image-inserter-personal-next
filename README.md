@@ -1,7 +1,7 @@
 # chat-image-inserter-
 Chat Image Inserter 是一款为 SillyTavern（酒馆）设计的轻量级扩展，让角色对话中的文字能自动插入图片。
 
-文字插图插件 · Chat Image Inserter
+正文插图插件
 中文介绍
 Chat Image Inserter 是一款为 SillyTavern（酒馆）设计的轻量级扩展，让角色对话中的文字能自动"长出"图片。当 AI 的输出里出现你预设的关键词或正则模式时，插件会在文字下方无缝插入对应的本地图片——就像给聊天加了一层可编程的"表情系统"。
 
