@@ -20,6 +20,7 @@ const defaultSettings = {
     portraitMaxWidth: 300,
     landscapeMaxWidth: 300,
     recentMessages: 0,
+    imageDisplayMode: 'cycle',
     themeMode: 'auto',
     compressLevel: 0, // 0=原图 1=轻度 2=中度 3=强力 4=极限
     excludedTags: [],
@@ -376,7 +377,13 @@ function scheduleImageUrlCachePrune() {
     }, 0);
 }
 
-async function ensureUrlsForMatchingRules(matchedRules) {
+async function ensureUrlsForMatchingRules(matchedRules, imageSelections = null) {
+    if (imageSelections) {
+        const imageIds = new Set();
+        for (const image of imageSelections.values()) if (image?.imageId) imageIds.add(image.imageId);
+        for (const imageId of imageIds) await ensureUrlFromIndexedDB(imageId);
+        return;
+    }
     for (const rule of matchedRules) await ensureUrlsForRule(rule);
 }
 
@@ -429,6 +436,7 @@ function migrateSettings(s) {
     if ('imgCollapsible' in s) delete s.imgCollapsible;
 
     if (typeof s.recentMessages !== 'number') s.recentMessages = 0;
+    if (!['cycle', 'random'].includes(s.imageDisplayMode)) s.imageDisplayMode = 'cycle';
     if (!['auto', 'dark', 'light'].includes(s.themeMode)) s.themeMode = 'auto';
     if (typeof s.compressLevel !== 'number' || s.compressLevel < 0 || s.compressLevel > 4) {
         s.compressLevel = 0;
@@ -632,19 +640,40 @@ function getRuleMatchKey(rule, occurrence) {
     return `${rule.id || 'rule'}:${occurrence}:${simpleHash(renderSignature)}`;
 }
 
-function createImageElement(rule, matchKey = '') {
+function buildRuleImageSelections(matchMap) {
+    const selections = new Map();
+    if (getSettings().imageDisplayMode !== 'random') return selections;
+    for (const [rule, matches] of matchMap) {
+        const images = getRuleImages(rule);
+        if (!images.length) continue;
+        const max = getRuleMaxMatches(rule);
+        const count = max > 0 ? Math.min(max, matches.length) : matches.length;
+        for (let occurrence = 0; occurrence < count; occurrence++) {
+            const randomIndex = Math.floor(Math.random() * images.length);
+            selections.set(getRuleMatchKey(rule, occurrence), images[randomIndex]);
+        }
+    }
+    return selections;
+}
+
+function createImageElement(rule, matchKey = '', selectedImage = null) {
     const s = getSettings();
     const images = getRuleImages(rule);
     if (!images.length) return null;
-    const firstIndex = images.findIndex(image => !!getImageUrlOfItem(image));
+    const selectedIndex = selectedImage ? images.indexOf(selectedImage) : -1;
+    const randomMode = s.imageDisplayMode === 'random';
+    const firstIndex = randomMode && selectedIndex >= 0
+        ? selectedIndex
+        : images.findIndex(image => !!getImageUrlOfItem(image));
     const firstUrl = firstIndex >= 0 ? getImageUrlOfItem(images[firstIndex]) : null;
     if (!firstUrl) return null;
 
     const wrap = document.createElement('div');
     wrap.className = 'cii-img-block';
     if (matchKey) wrap.dataset.ciiMatchKey = matchKey;
+    wrap.dataset.ciiDisplayMode = s.imageDisplayMode || 'cycle';
     wrap.dataset.ciiPlacement = rule.imagePosition || 'after';
-    if (images.length > 1) wrap.classList.add('cii-multi');
+    if (images.length > 1 && !randomMode) wrap.classList.add('cii-multi');
     wrap.style.setProperty('max-width', '100%', 'important');
     wrap.style.setProperty('display', 'block', 'important');
     wrap.style.setProperty('width', '100%', 'important');
@@ -668,7 +697,7 @@ function createImageElement(rule, matchKey = '') {
     let currentIndex = firstIndex;
     let isSwitching = false;
 
-    if (images.length > 1) {
+    if (images.length > 1 && !randomMode) {
         const indicator = document.createElement('span');
         indicator.className = 'cii-img-indicator';
         indicator.setAttribute('data-text', `${currentIndex + 1}/${images.length}`);
@@ -707,6 +736,21 @@ function createImageElement(rule, matchKey = '') {
 
     wrap.appendChild(img);
     return wrap;
+}
+
+function getImageBlockForMatch(rule, matchKey, selectedImage, existingByKey) {
+    const existing = existingByKey.get(matchKey);
+    const mode = getSettings().imageDisplayMode || 'cycle';
+    if (existing && (existing.dataset.ciiDisplayMode || 'cycle') === mode) return existing;
+
+    const replacement = createImageElement(rule, matchKey, selectedImage);
+    if (!replacement) return existing || null;
+    if (existing) {
+        replacement.dataset.ciiPlacement = existing.dataset.ciiPlacement || rule.imagePosition || 'after';
+        existing.replaceWith(replacement);
+    }
+    existingByKey.set(matchKey, replacement);
+    return replacement;
 }
 
 function normalizeExcludedTag(value) {
@@ -979,7 +1023,7 @@ function alignImageBlocksToMessage(container) {
     }
 }
 
-function applyRulesToElement(container, matchableMessageText = null, sourceMatchMap = null) {
+function applyRulesToElement(container, matchableMessageText = null, sourceMatchMap = null, imageSelections = null) {
     const s = getSettings();
     const existingBlocks = Array.from(container.querySelectorAll('.cii-img-block'));
     const matchesByRule = sourceMatchMap || collectRuleMatchMap(matchableMessageText || '', s.rules);
@@ -1069,7 +1113,10 @@ function applyRulesToElement(container, matchableMessageText = null, sourceMatch
         const retainedCount = max > 0 ? Math.min(sourceCount, max) : sourceCount;
         for (let occurrence = 0; occurrence < retainedCount; occurrence++) {
             const key = getRuleMatchKey(rule, occurrence);
-            if (existingByKey.has(key)) desiredKeys.add(key);
+            if (existingByKey.has(key)) {
+                desiredKeys.add(key);
+                getImageBlockForMatch(rule, key, imageSelections?.get(key), existingByKey);
+            }
         }
     }
 
@@ -1119,13 +1166,13 @@ function applyRulesToElement(container, matchableMessageText = null, sourceMatch
                 else endImages.push({ rule: m.rule, matchKey: m.matchKey });
                 continue;
             }
-            const existingBlock = existingByKey.get(m.matchKey);
+            const existingBlock = getImageBlockForMatch(m.rule, m.matchKey, imageSelections?.get(m.matchKey), existingByKey);
             if (existingBlock?.dataset.ciiPlacement === 'after' && !m.rule.removeMatched) continue;
             try {
                 if (m.end > current.nodeValue.length) continue;
                 current.splitText(m.end);
                 const mid = current.splitText(m.start);
-                const block = existingBlock || createImageElement(m.rule, m.matchKey);
+                const block = existingBlock || createImageElement(m.rule, m.matchKey, imageSelections?.get(m.matchKey));
                 if (!block) continue;
                 parent.insertBefore(block, mid.nextSibling);
                 block.dataset.ciiPlacement = 'after';
@@ -1149,7 +1196,7 @@ function applyRulesToElement(container, matchableMessageText = null, sourceMatch
     if (startImages.length) {
         const frag = document.createDocumentFragment();
         for (const { rule, matchKey } of startImages) {
-            const block = existingByKey.get(matchKey) || createImageElement(rule, matchKey);
+            const block = getImageBlockForMatch(rule, matchKey, imageSelections?.get(matchKey), existingByKey);
             if (block) {
                 block.dataset.ciiPlacement = 'start';
                 frag.appendChild(block);
@@ -1158,7 +1205,7 @@ function applyRulesToElement(container, matchableMessageText = null, sourceMatch
         container.insertBefore(frag, container.firstChild);
     }
     for (const { rule, matchKey } of endImages) {
-        const block = existingByKey.get(matchKey) || createImageElement(rule, matchKey);
+        const block = getImageBlockForMatch(rule, matchKey, imageSelections?.get(matchKey), existingByKey);
         if (block) {
             block.dataset.ciiPlacement = 'end';
             container.appendChild(block);
@@ -1170,7 +1217,7 @@ function applyRulesToElement(container, matchableMessageText = null, sourceMatch
     for (const { rule, matchKey, paragraph } of paragraphImages) {
         if (!paragraph?.parentNode) continue;
         const anchor = paragraphAnchors.get(paragraph) || paragraph;
-        const block = existingByKey.get(matchKey) || createImageElement(rule, matchKey);
+        const block = getImageBlockForMatch(rule, matchKey, imageSelections?.get(matchKey), existingByKey);
         if (!block) continue;
         anchor.parentNode.insertBefore(block, anchor.nextSibling);
         block.dataset.ciiPlacement = 'paragraph';
@@ -1262,14 +1309,20 @@ async function processAllMessages() {
             if (!changedElements.length) continue;
 
             const sourceMatchMap = collectRuleMatchMap(matchableMessageText, s.rules);
+            const imageSelections = buildRuleImageSelections(sourceMatchMap);
             const pinnedIds = new Set();
-            for (const rule of sourceMatchMap.keys()) {
-                const image = getRuleImages(rule)[0];
-                if (image?.imageId) pinnedIds.add(image.imageId);
+            if (imageSelections.size) {
+                for (const image of imageSelections.values()) if (image?.imageId) pinnedIds.add(image.imageId);
+            } else {
+                for (const rule of sourceMatchMap.keys()) {
+                    const image = getRuleImages(rule)[0];
+                    if (image?.imageId) pinnedIds.add(image.imageId);
+                }
             }
             pinnedIds.forEach(id => pendingImageUrlPins.add(id));
             try {
-                await ensureUrlsForMatchingRules(Array.from(sourceMatchMap.keys()));
+                await ensureUrlsForMatchingRules(Array.from(sourceMatchMap.keys()),
+                    s.imageDisplayMode === 'random' ? imageSelections : null);
 
                 // A render may have replaced the message while image URLs were
                 // loading. Let the next debounced pass handle its latest text.
@@ -1286,7 +1339,7 @@ async function processAllMessages() {
                     }
                     const ownerMessage = el.closest('.mes');
                     if (ownerMessage) pluginMutationMessages.add(ownerMessage);
-                    applyRulesToElement(el, matchableMessageText, sourceMatchMap);
+                    applyRulesToElement(el, matchableMessageText, sourceMatchMap, imageSelections);
                     processedHashes.set(el, getMessageFingerprint(el, matchableMessageText));
                     if (ownerMessage) setTimeout(() => pluginMutationMessages.delete(ownerMessage), 0);
                 }
@@ -2134,6 +2187,14 @@ function buildSettingsHtml() {
                         </div>
                         <div class="cii-dim cii-tiny">插件按图片原始宽高区分竖版和横版；正方形图片使用横版上限。图片会保持原始比例。</div>
                         <div class="cii-row" style="margin-top:10px;">
+                            <label class="cii-inline-label" for="cii-image-display-mode" style="min-width:auto;">图片显示方式</label>
+                            <select id="cii-image-display-mode" class="text_pole" style="flex:1; min-width:220px;">
+                                <option value="cycle">多图点击切换</option>
+                                <option value="random">随机显示单张</option>
+                            </select>
+                        </div>
+                        <div class="cii-dim cii-tiny">随机模式会在每次命中时抽取一张图片，不显示切换按钮；只读取抽中的图片。</div>
+                        <div class="cii-row" style="margin-top:10px;">
                             <label class="cii-inline-label" style="min-width:auto;">界面主题</label>
                             <select id="cii-theme" class="text_pole" style="min-width:150px;">
                                 <option value="auto">🌗 跟随酒馆 / 系统</option>
@@ -2314,6 +2375,15 @@ function bindEvents() {
         .on('input.cii', '#cii-recent', function () {
             const v = Math.max(0, Math.min(9999, Math.floor(Number(this.value) || 0)));
             getSettings().recentMessages = v;
+            saveSettings();
+            resetProcessing();
+            scheduleProcess();
+        });
+
+    $(document)
+        .off('change.cii', '#cii-image-display-mode')
+        .on('change.cii', '#cii-image-display-mode', function () {
+            getSettings().imageDisplayMode = this.value === 'random' ? 'random' : 'cycle';
             saveSettings();
             resetProcessing();
             scheduleProcess();
@@ -3326,6 +3396,7 @@ async function loadSettings() {
     $('#cii-portrait-maxwidth').val(s.portraitMaxWidth || s.maxWidth || 300);
     $('#cii-landscape-maxwidth').val(s.landscapeMaxWidth || s.maxWidth || 300);
     $('#cii-recent').val(Math.max(0, Math.floor(Number(s.recentMessages) || 0)));
+    $('#cii-image-display-mode').val(s.imageDisplayMode || 'cycle');
     $('#cii-excluded-tags').val(formatExcludedTags(s.excludedTags));
     $('#cii-theme').val(s.themeMode || 'auto');
     $('#cii-compress').val(String(s.compressLevel || 0));
