@@ -1740,7 +1740,7 @@ function buildSettingsHtml() {
         <div id="cii-settings" class="cii-settings">
             <div class="inline-drawer">
                 <div class="inline-drawer-toggle inline-drawer-header">
-                    <b><i class="fa-solid fa-wand-magic-sparkles cii-accent-icon"></i> 正文插图 <span class="cii-en-title">Chat Image Inserter</span></b>
+                    <b><i class="fa-solid fa-wand-magic-sparkles cii-accent-icon"></i> 正文插图</b>
                     <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
                 </div>
                 <div class="inline-drawer-content">
@@ -2270,20 +2270,10 @@ function injectStyles() {
         }
         .cii-settings .cii-en-title {
             font-size: 0.78em;
-            font-weight: 700;
-            background: linear-gradient(105deg, #f06ba8 0%, #ffd1e5 28%, #ee78b4 48%, #ffb7d5 68%, #e86aa7 100%);
-            background-size: 220% 100%;
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            filter: drop-shadow(0 1px 3px rgba(240, 107, 168, .34));
+            color: var(--cii-pink-deep);
+            opacity: 0.75;
             margin-left: 6px;
-            letter-spacing: 0.45px;
-            animation: cii-title-shimmer 4s ease-in-out infinite;
-        }
-        @keyframes cii-title-shimmer {
-            0%, 100% { background-position: 100% 50%; }
-            50% { background-position: 0% 50%; }
+            letter-spacing: 0.3px;
         }
         .cii-settings .cii-card {
             background: linear-gradient(135deg,
@@ -2801,7 +2791,7 @@ function injectStyles() {
             letter-spacing: .35px;
         }
         #cii-settings .cii-en-title {
-            font-weight: 700;
+            font-weight: 500;
             letter-spacing: .55px;
         }
         #cii-settings .inline-drawer-content { padding-top: 6px; }
