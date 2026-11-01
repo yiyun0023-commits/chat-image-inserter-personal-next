@@ -1740,7 +1740,7 @@ function buildSettingsHtml() {
         <div id="cii-settings" class="cii-settings">
             <div class="inline-drawer">
                 <div class="inline-drawer-toggle inline-drawer-header">
-                    <b><i class="fa-solid fa-wand-magic-sparkles cii-accent-icon"></i> <span class="cii-title-text" data-title="正文插图">正文插图</span></b>
+                    <b><i class="fa-solid fa-wand-magic-sparkles cii-accent-icon"></i> <span class="cii-title-text">正文插图</span></b>
                     <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
                 </div>
                 <div class="inline-drawer-content">
@@ -2276,53 +2276,14 @@ function injectStyles() {
             letter-spacing: 0.3px;
         }
         .cii-settings .cii-title-text {
-            position: relative;
             display: inline-block;
             font-weight: 800;
-            color: #c9568e !important;
-            -webkit-text-fill-color: #c9568e;
-            text-shadow: 0 1px 1px rgba(255,255,255,.5), 0 0 7px rgba(224, 117, 166, .28);
-            isolation: isolate;
-        }
-        #cii-settings .cii-title-text::after {
-            content: attr(data-title);
-            position: absolute;
-            inset: 0;
-            color: transparent;
-            -webkit-text-fill-color: transparent !important;
-            background-image: linear-gradient(108deg, transparent 20%, rgba(255,255,255,.12) 36%, #fff8fc 48%, #ffd5e8 52%, rgba(255,255,255,.12) 62%, transparent 78%);
-            background-size: 260% 100%;
-            background-position: 150% 50%;
-            background-repeat: no-repeat;
-            -webkit-background-clip: text !important;
+            font-size: 1.18em;
+            background: linear-gradient(135deg, #ffb7d5, #c4a7ff);
+            -webkit-background-clip: text;
             background-clip: text;
-            filter: drop-shadow(0 0 3px rgba(255, 224, 239, .9));
-            pointer-events: none;
-            animation: cii-title-light-flow 3.2s ease-in-out infinite;
-        }
-        #cii-settings .cii-title-text::before {
-            content: '✦';
-            position: absolute;
-            z-index: 1;
-            top: -.35em;
-            left: -.2em;
-            color: #fff8fd;
-            -webkit-text-fill-color: #fff8fd;
-            font-size: .62em;
-            text-shadow: 0 0 3px #e968a6, 0 0 8px rgba(240, 107, 168, .8);
-            opacity: 0;
-            pointer-events: none;
-            animation: cii-title-star-flow 3.2s ease-in-out infinite;
-        }
-        @keyframes cii-title-light-flow {
-            0%, 12% { background-position: 150% 50%; }
-            72%, 100% { background-position: -60% 50%; }
-        }
-        @keyframes cii-title-star-flow {
-            0%, 12% { opacity: 0; transform: translateX(0) scale(.55) rotate(0deg); }
-            22% { opacity: 1; }
-            68% { opacity: .95; transform: translateX(3.5em) scale(1) rotate(50deg); }
-            82%, 100% { opacity: 0; transform: translateX(3.8em) scale(.5) rotate(80deg); }
+            color: transparent;
+            letter-spacing: 0.3px;
         }
         .cii-settings .cii-card {
             background: linear-gradient(135deg,
