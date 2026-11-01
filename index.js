@@ -2885,6 +2885,95 @@ function injectStyles() {
             #cii-settings .cii-tiny-inline { display: none; }
         }
 
+        /* 画册感细节：柔纸色、低对比描边与照片展示框 */
+        #cii-settings .cii-card {
+            background:
+                radial-gradient(ellipse at 0% 0%, rgba(255, 213, 231, .17), transparent 48%),
+                linear-gradient(145deg, rgba(255, 255, 255, .11), rgba(244, 235, 255, .08)),
+                var(--cii-card-bg);
+            border-color: rgba(231, 177, 207, .34);
+            box-shadow: 0 7px 22px rgba(124, 88, 125, .08), inset 0 1px 0 rgba(255,255,255,.42);
+        }
+        #cii-settings.cii-theme-light .cii-card {
+            background:
+                radial-gradient(ellipse at 0% 0%, rgba(255, 220, 235, .28), transparent 52%),
+                linear-gradient(145deg, rgba(255,255,255,.98), rgba(250,246,253,.96));
+            border-color: rgba(225, 183, 207, .48);
+            box-shadow: 0 8px 24px rgba(147, 110, 137, .09), inset 0 1px 0 #fff;
+        }
+        #cii-settings.cii-theme-dark .cii-card {
+            background:
+                radial-gradient(ellipse at 0% 0%, rgba(255, 183, 213, .09), transparent 52%),
+                linear-gradient(145deg, rgba(43, 35, 55, .97), rgba(35, 30, 48, .96));
+            border-color: rgba(211, 166, 206, .28);
+            box-shadow: 0 8px 24px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.06);
+        }
+        #cii-settings .cii-card-title {
+            color: var(--cii-text);
+            border-bottom-color: rgba(219, 173, 205, .24);
+        }
+        #cii-settings .cii-emoji {
+            border: 1px solid rgba(222, 180, 211, .25);
+            background: linear-gradient(145deg, rgba(255, 231, 241, .58), rgba(235, 226, 251, .58));
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.65);
+        }
+        #cii-settings .cii-group {
+            border-color: rgba(220, 174, 205, .36);
+            background: linear-gradient(145deg, rgba(255, 244, 249, .26), rgba(246, 241, 253, .2));
+        }
+        #cii-settings.cii-theme-dark .cii-group {
+            background: linear-gradient(145deg, rgba(255, 183, 213, .055), rgba(196, 167, 255, .045));
+        }
+        #cii-settings .cii-group-head {
+            background: linear-gradient(105deg, rgba(255, 221, 235, .34), rgba(236, 224, 250, .3));
+        }
+        #cii-settings .cii-group-head:hover {
+            background: linear-gradient(105deg, rgba(255, 221, 235, .52), rgba(236, 224, 250, .48));
+        }
+        #cii-settings .cii-rule {
+            border-color: rgba(222, 179, 209, .36);
+            background: linear-gradient(145deg, rgba(255, 255, 255, .44), rgba(249, 244, 252, .34));
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.4);
+        }
+        #cii-settings.cii-theme-dark .cii-rule {
+            background: linear-gradient(145deg, rgba(255, 255, 255, .045), rgba(196, 167, 255, .035));
+        }
+        #cii-settings .cii-rule-head { padding: 9px 12px; }
+        #cii-settings .cii-rule-body { border-top-color: rgba(222, 179, 209, .32); }
+        #cii-settings .cii-image-item {
+            padding: 3px;
+            border: 1px solid rgba(255,255,255,.92);
+            background: linear-gradient(145deg, #fff, #f7edf5);
+            box-shadow: 0 3px 10px rgba(85, 57, 84, .14), 0 0 0 1px rgba(221, 174, 205, .42);
+        }
+        #cii-settings .cii-image-item img { border-radius: 9px; }
+        #cii-settings .cii-image-add {
+            border-color: rgba(215, 163, 199, .58);
+            color: #b67ca5;
+            background: linear-gradient(145deg, rgba(255, 239, 246, .68), rgba(244, 237, 252, .68));
+        }
+        #cii-settings .cii-stat {
+            background: linear-gradient(145deg, rgba(255, 242, 248, .63), rgba(244, 239, 252, .58));
+            border-color: rgba(225, 179, 207, .32);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.72);
+        }
+        #cii-settings.cii-theme-dark .cii-stat {
+            background: linear-gradient(145deg, rgba(255, 183, 213, .09), rgba(196, 167, 255, .08));
+        }
+        #cii-settings .cii-btn { box-shadow: 0 2px 7px rgba(120, 85, 120, .055); }
+        #cii-settings .cii-btn-primary {
+            background: linear-gradient(125deg, #eaa2c0, #b7a0dc);
+            border-color: rgba(255,255,255,.38);
+            box-shadow: 0 4px 12px rgba(181, 132, 174, .2);
+        }
+        #cii-settings .cii-btn-secondary { background: rgba(255,255,255,.16); }
+        #cii-settings .cii-btn-add { background: linear-gradient(135deg, rgba(255,240,247,.34), rgba(246,240,253,.3)); }
+        #cii-settings .text_pole,
+        #cii-settings select.text_pole {
+            box-shadow: inset 0 1px 2px rgba(75, 50, 75, .035);
+        }
+        #cii-settings .cii-tiny { max-width: 78ch; }
+
         /* ============ 聊天里插入的图片（支持多图切换） ============ */
         .cii-img-block {
             position: relative;
