@@ -39,6 +39,7 @@ const DB_NAME = 'cii-images-db';
 const DB_VERSION = 4;
 const STORE = 'images';
 const META_STORE = 'image_metadata';
+const MAX_CACHED_IMAGE_URLS = 64;
 
 let processedHashes = new WeakMap();
 let observer = null;
@@ -49,9 +50,11 @@ const pluginMutationMessages = new WeakSet();
 let dbPromise = null;
 let processing = false;
 let pendingProcess = false;
-let switchLock = false;
 let compressing = false;
 const urlCache = new Map();
+const pendingImageUrlLoads = new Map();
+const pendingImageUrlPins = new Set();
+const regexCache = new WeakMap();
 
 /* ================= 提示 / 工具 ================= */
 
@@ -326,37 +329,64 @@ function releaseImageUrl(key) {
 
 async function ensureUrlFromIndexedDB(imageId) {
     if (!imageId) return null;
-    if (urlCache.has(imageId)) return urlCache.get(imageId);
-    const rec = await getImage(imageId);
-    if (!rec || !rec.blob) return null;
-    const url = URL.createObjectURL(rec.blob);
-    urlCache.set(imageId, url);
-    return url;
+    if (urlCache.has(imageId)) {
+        const url = urlCache.get(imageId);
+        urlCache.delete(imageId);
+        urlCache.set(imageId, url);
+        return url;
+    }
+    if (pendingImageUrlLoads.has(imageId)) return pendingImageUrlLoads.get(imageId);
+    const loadPromise = (async () => {
+        const rec = await getImage(imageId);
+        if (!rec || !rec.blob) return null;
+        const cachedUrl = urlCache.get(imageId);
+        if (cachedUrl) return cachedUrl;
+        const url = URL.createObjectURL(rec.blob);
+        cacheImageUrl(imageId, url);
+        return url;
+    })();
+    pendingImageUrlLoads.set(imageId, loadPromise);
+    try { return await loadPromise; }
+    finally { pendingImageUrlLoads.delete(imageId); }
 }
 
 async function ensureUrlsForRule(rule) {
-    if (!Array.isArray(rule?.images)) return;
-    for (const img of rule.images) {
-        if (img.imageId && !urlCache.has(img.imageId)) {
-            await ensureUrlFromIndexedDB(img.imageId);
-        }
+    for (const image of getRuleImages(rule)) {
+        if (getImageUrlOfItem(image)) return;
+        if (image.imageId && await ensureUrlFromIndexedDB(image.imageId)) return;
     }
 }
 
-async function ensureUrlsForMatchingRules(text) {
-    const s = getSettings();
-    for (const rule of s.rules) {
-        if (rule.enabled === false || !rule.pattern || !Array.isArray(rule.images) || !rule.images.length) continue;
-        if (findMatches(text, rule).length) await ensureUrlsForRule(rule);
-    }
+function cacheImageUrl(imageId, url) {
+    urlCache.set(imageId, url);
+}
+
+function scheduleImageUrlCachePrune() {
+    if (urlCache.size <= MAX_CACHED_IMAGE_URLS) return;
+    setTimeout(() => {
+        const activeIds = new Set(pendingImageUrlPins);
+        document.querySelectorAll('img[data-cii-image-id]').forEach(img => {
+            if (img.dataset.ciiImageId) activeIds.add(img.dataset.ciiImageId);
+        });
+        for (const [imageId, url] of urlCache) {
+            if (activeIds.has(imageId)) continue;
+            try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+            urlCache.delete(imageId);
+        }
+    }, 0);
+}
+
+async function ensureUrlsForMatchingRules(matchedRules) {
+    for (const rule of matchedRules) await ensureUrlsForRule(rule);
 }
 
 let previewImageObserver = null;
 
 function observePreviewImage(imageElement, imageId) {
     if (!imageElement || !imageId) return;
+    imageElement.dataset.ciiImageId = imageId;
     if (urlCache.has(imageId)) {
-        imageElement.src = urlCache.get(imageId);
+        imageElement.src = getImageUrlOfItem({ imageId });
         return;
     }
 
@@ -369,7 +399,10 @@ function observePreviewImage(imageElement, imageId) {
                     const id = target.dataset.ciiImageId;
                     previewImageObserver.unobserve(target);
                     ensureUrlFromIndexedDB(id).then(url => {
-                        if (url && target.isConnected) target.src = url;
+                        if (url && target.isConnected) {
+                            target.src = url;
+                            scheduleImageUrlCachePrune();
+                        }
                     }).catch(error => console.warn('[CII] 加载图片预览失败', error));
                 }
             }, { rootMargin: '120px' });
@@ -380,7 +413,10 @@ function observePreviewImage(imageElement, imageId) {
     }
 
     ensureUrlFromIndexedDB(imageId).then(url => {
-        if (url && imageElement.isConnected) imageElement.src = url;
+        if (url && imageElement.isConnected) {
+            imageElement.src = url;
+            scheduleImageUrlCachePrune();
+        }
     }).catch(error => console.warn('[CII] 加载图片预览失败', error));
 }
 
@@ -512,7 +548,13 @@ function guessExt(type) {
 function getImageUrlOfItem(img) {
     if (!img) return null;
     if (img.imageSrc) return img.imageSrc;
-    return img.imageId ? (urlCache.get(img.imageId) || null) : null;
+    if (!img.imageId) return null;
+    const url = urlCache.get(img.imageId) || null;
+    if (url) {
+        urlCache.delete(img.imageId);
+        urlCache.set(img.imageId, url);
+    }
+    return url;
 }
 
 function normalizeImageMaxWidth(value, fallback = 300) {
@@ -530,13 +572,13 @@ function applyImageMaxWidth(img, settings = getSettings()) {
     img.style.setProperty('max-width', `min(100%, ${maxWidth}px)`, 'important');
 }
 
-function getUsableImages(rule) {
-    if (!Array.isArray(rule.images)) return [];
-    return rule.images.filter(img => !!getImageUrlOfItem(img));
+function ruleHasImageReady(rule) {
+    return getRuleImages(rule).length > 0;
 }
 
-function ruleHasImageReady(rule) {
-    return getUsableImages(rule).length > 0;
+function getRuleImages(rule) {
+    if (!Array.isArray(rule?.images)) return [];
+    return rule.images.filter(img => img && (img.imageSrc || img.imageId));
 }
 
 /* ================= 匹配 ================= */
@@ -546,14 +588,20 @@ function findMatches(text, rule) {
     const pattern = rule.pattern;
     if (!pattern) return ranges;
     if (rule.isRegex) {
-        try {
-            const re = new RegExp(pattern, 'gi');
-            let m;
-            while ((m = re.exec(text)) !== null) {
-                if (m[0].length === 0) { re.lastIndex++; continue; }
-                ranges.push({ start: m.index, end: m.index + m[0].length });
-            }
-        } catch { /* 正则非法时忽略 */ }
+        let cached = regexCache.get(rule);
+        if (!cached || cached.pattern !== pattern) {
+            try {
+                cached = { pattern, regex: new RegExp(pattern, 'gi') };
+                regexCache.set(rule, cached);
+            } catch { return ranges; }
+        }
+        const re = cached.regex;
+        re.lastIndex = 0;
+        let m;
+        while ((m = re.exec(text)) !== null) {
+            if (m[0].length === 0) { re.lastIndex++; continue; }
+            ranges.push({ start: m.index, end: m.index + m[0].length });
+        }
     } else {
         let idx = text.indexOf(pattern);
         while (idx !== -1) {
@@ -562,6 +610,16 @@ function findMatches(text, rule) {
         }
     }
     return ranges;
+}
+
+function collectRuleMatchMap(text, rules) {
+    const matchMap = new Map();
+    for (const rule of rules) {
+        if (rule.enabled === false || !rule.pattern || !ruleHasImageReady(rule)) continue;
+        const matches = findMatches(text, rule);
+        if (matches.length) matchMap.set(rule, matches);
+    }
+    return matchMap;
 }
 
 /* ================= 图片元素（多图可切换 —— 修复版） ================= */
@@ -576,14 +634,17 @@ function getRuleMatchKey(rule, occurrence) {
 
 function createImageElement(rule, matchKey = '') {
     const s = getSettings();
-    const usable = getUsableImages(rule);
-    if (!usable.length) return null;
+    const images = getRuleImages(rule);
+    if (!images.length) return null;
+    const firstIndex = images.findIndex(image => !!getImageUrlOfItem(image));
+    const firstUrl = firstIndex >= 0 ? getImageUrlOfItem(images[firstIndex]) : null;
+    if (!firstUrl) return null;
 
     const wrap = document.createElement('div');
     wrap.className = 'cii-img-block';
     if (matchKey) wrap.dataset.ciiMatchKey = matchKey;
     wrap.dataset.ciiPlacement = rule.imagePosition || 'after';
-    if (usable.length > 1) wrap.classList.add('cii-multi');
+    if (images.length > 1) wrap.classList.add('cii-multi');
     wrap.style.setProperty('max-width', '100%', 'important');
     wrap.style.setProperty('display', 'block', 'important');
     wrap.style.setProperty('width', '100%', 'important');
@@ -601,33 +662,44 @@ function createImageElement(rule, matchKey = '') {
     img.style.setProperty('margin-left', 'auto', 'important');
     img.style.setProperty('margin-right', 'auto', 'important');
     img.addEventListener('load', () => applyImageMaxWidth(img));
-    img.src = getImageUrlOfItem(usable[0]);
+    img.dataset.ciiImageId = images[firstIndex].imageId || '';
+    img.src = firstUrl;
 
-    let currentIndex = 0;
+    let currentIndex = firstIndex;
+    let isSwitching = false;
 
-    if (usable.length > 1) {
+    if (images.length > 1) {
         const indicator = document.createElement('span');
         indicator.className = 'cii-img-indicator';
-        indicator.setAttribute('data-text', `1/${usable.length}`);
+        indicator.setAttribute('data-text', `${currentIndex + 1}/${images.length}`);
         indicator.title = '点击图片切换到下一张';
 
-        img.addEventListener('click', e => {
+        img.addEventListener('click', async e => {
             e.preventDefault();
             e.stopPropagation();
-            switchLock = true;
-            currentIndex = (currentIndex + 1) % usable.length;
-            const url = getImageUrlOfItem(usable[currentIndex]);
-            if (url) img.src = url;
-            indicator.setAttribute('data-text', `${currentIndex + 1}/${usable.length}`);
+            if (isSwitching) return;
+            isSwitching = true;
             img.classList.add('cii-switching');
-            setTimeout(() => {
-                img.classList.remove('cii-switching');
-                switchLock = false;
-                if (pendingProcess) {
-                    pendingProcess = false;
-                    scheduleProcess();
+            const nextIndex = (currentIndex + 1) % images.length;
+            try {
+                const nextImage = images[nextIndex];
+                const url = getImageUrlOfItem(nextImage)
+                    || (nextImage.imageId ? await ensureUrlFromIndexedDB(nextImage.imageId) : null);
+                if (url) {
+                    currentIndex = nextIndex;
+                    img.dataset.ciiImageId = nextImage.imageId || '';
+                    img.src = url;
+                    indicator.setAttribute('data-text', `${currentIndex + 1}/${images.length}`);
+                    scheduleImageUrlCachePrune();
                 }
-            }, 220);
+            } catch (error) {
+                console.warn('[CII] 切换图片失败', error);
+            } finally {
+                setTimeout(() => {
+                    img.classList.remove('cii-switching');
+                    isSwitching = false;
+                }, 220);
+            }
         });
 
         wrap.appendChild(indicator);
@@ -818,9 +890,55 @@ function findParagraphElement(node, container) {
 }
 
 let chatImageAlignmentObserver = null;
+const observedImageBodies = new Set();
+const pendingImageAlignment = new Set();
+let imageAlignmentFrame = 0;
+
+function queueImageAlignment(messageBody) {
+    if (!messageBody?.isConnected) return;
+    pendingImageAlignment.add(messageBody);
+    if (imageAlignmentFrame) return;
+    const run = () => {
+        imageAlignmentFrame = 0;
+        const bodies = Array.from(pendingImageAlignment);
+        pendingImageAlignment.clear();
+        for (const body of bodies) {
+            if (body.isConnected && body.querySelector('.cii-img-block')) alignImageBlocksToMessage(body);
+            else unobserveImageBody(body);
+        }
+    };
+    imageAlignmentFrame = typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame(run)
+        : setTimeout(run, 16);
+}
+
+function unobserveImageBody(messageBody) {
+    if (!messageBody || !observedImageBodies.has(messageBody)) return;
+    chatImageAlignmentObserver?.unobserve(messageBody);
+    observedImageBodies.delete(messageBody);
+    pendingImageAlignment.delete(messageBody);
+}
+
+function unobserveRemovedMessageBodies(node) {
+    if (node?.nodeType !== Node.ELEMENT_NODE) return;
+    const bodies = [];
+    if (node.matches('.mes_text')) bodies.push(node);
+    node.querySelectorAll('.mes_text').forEach(body => bodies.push(body));
+    for (const body of bodies) if (!body.isConnected) unobserveImageBody(body);
+}
+
+function removeImageBlock(block) {
+    const messageBody = block?.closest('.mes_text');
+    block?.remove();
+    if (messageBody && !messageBody.querySelector('.cii-img-block')) unobserveImageBody(messageBody);
+}
 
 function alignImageBlocksToMessage(container) {
     const messageBody = container.closest('.mes_text') || container;
+    if (!messageBody.querySelector('.cii-img-block')) {
+        unobserveImageBody(messageBody);
+        return;
+    }
     const bodyRect = messageBody.getBoundingClientRect();
     const bodyStyle = window.getComputedStyle(messageBody);
     const paddingLeft = parseFloat(bodyStyle.paddingLeft) || 0;
@@ -848,29 +966,27 @@ function alignImageBlocksToMessage(container) {
         if (block.style.getPropertyValue('margin') !== '6px 0px') block.style.setProperty('margin', '6px 0', 'important');
     }
 
-    if (!chatImageAlignmentObserver && typeof ResizeObserver !== 'undefined') {
-        const chat = document.querySelector('#chat');
-        if (chat) {
-            chatImageAlignmentObserver = new ResizeObserver(() => {
-                const bodies = new Set();
-                chat.querySelectorAll('.cii-img-block').forEach(block => {
-                    const body = block.closest('.mes_text');
-                    if (body) bodies.add(body);
-                });
-                bodies.forEach(body => alignImageBlocksToMessage(body));
+    if (typeof ResizeObserver !== 'undefined') {
+        if (!chatImageAlignmentObserver) {
+            chatImageAlignmentObserver = new ResizeObserver(entries => {
+                for (const entry of entries) queueImageAlignment(entry.target);
             });
-            chatImageAlignmentObserver.observe(chat);
+        }
+        if (!observedImageBodies.has(messageBody)) {
+            observedImageBodies.add(messageBody);
+            chatImageAlignmentObserver.observe(messageBody);
         }
     }
 }
 
-function applyRulesToElement(container, matchableMessageText = null) {
+function applyRulesToElement(container, matchableMessageText = null, sourceMatchMap = null) {
     const s = getSettings();
     const existingBlocks = Array.from(container.querySelectorAll('.cii-img-block'));
-    const rules = s.rules.filter(r => r.enabled !== false && r.pattern && ruleHasImageReady(r)
-        && findMatches(matchableMessageText, r).length > 0);
+    const matchesByRule = sourceMatchMap || collectRuleMatchMap(matchableMessageText || '', s.rules);
+    const rules = s.rules.filter(r => matchesByRule.has(r));
     if (!rules.length) {
-        existingBlocks.forEach(block => block.remove());
+        existingBlocks.forEach(removeImageBlock);
+        alignImageBlocksToMessage(container);
         return;
     }
     const existingByKey = new Map();
@@ -924,7 +1040,7 @@ function applyRulesToElement(container, matchableMessageText = null) {
         // The source text above is authoritative. If thinking and body text are
         // both present in the rendered tree, keep only the rightmost occurrences
         // counted in the body source (the <content> block follows <thinking>).
-        const allowedBodyMatches = findMatches(matchableMessageText, rule).length;
+        const allowedBodyMatches = matchesByRule.get(rule)?.length || 0;
         const bodyMatches = ruleMatches.slice(-allowedBodyMatches);
         bodyMatches.sort((a, b) => a.nodeIdx - b.nodeIdx || a.start - b.start);
         const sourceOffset = Math.max(0, allowedBodyMatches - bodyMatches.length);
@@ -948,7 +1064,7 @@ function applyRulesToElement(container, matchableMessageText = null) {
     // even though those words no longer exist in the rendered text nodes.
     for (const rule of rules) {
         if (!rule.removeMatched) continue;
-        const sourceCount = findMatches(matchableMessageText, rule).length;
+        const sourceCount = matchesByRule.get(rule)?.length || 0;
         const max = getRuleMaxMatches(rule);
         const retainedCount = max > 0 ? Math.min(sourceCount, max) : sourceCount;
         for (let occurrence = 0; occurrence < retainedCount; occurrence++) {
@@ -1023,7 +1139,7 @@ function applyRulesToElement(container, matchableMessageText = null) {
     // occurrence, image set and position remain untouched in the DOM.
     for (const block of existingBlocks) {
         const key = block.dataset.ciiMatchKey;
-        if (!key || !desiredKeys.has(key)) block.remove();
+        if (!key || !desiredKeys.has(key)) removeImageBlock(block);
     }
     if (!allMatches.length) {
         if (existingBlocks.length) alignImageBlocksToMessage(container);
@@ -1065,7 +1181,7 @@ function applyRulesToElement(container, matchableMessageText = null) {
 }
 
 async function processAllMessages() {
-    if (switchLock || compressing) { pendingProcess = true; return; }
+    if (compressing) { pendingProcess = true; return; }
     if (processing) { pendingProcess = true; return; }
     const requestedFullScan = fullProcessRequested || dirtyMessages.size === 0;
     const requestedDirtyMessages = Array.from(dirtyMessages);
@@ -1075,19 +1191,25 @@ async function processAllMessages() {
     try {
         const s = getSettings();
         if (!s.enabled) {
-            document.querySelectorAll('#chat .mes .cii-img-block').forEach(el => el.remove());
+            document.querySelectorAll('#chat .mes .cii-img-block').forEach(removeImageBlock);
             return;
         }
         const recentN = Math.max(0, Math.floor(Number(s.recentMessages) || 0));
-        const allMes = Array.from(document.querySelectorAll('#chat .mes'));
-        const total = allMes.length;
+        const chat = document.getElementById('chat');
+        const allMes = requestedFullScan || recentN > 0
+            ? Array.from(chat?.querySelectorAll('.mes') || [])
+            : null;
+        const messageIndexes = recentN > 0
+            ? new Map(allMes.map((message, index) => [message, index]))
+            : null;
+        const total = allMes?.length || 0;
         const startIdx = (recentN > 0 && total > recentN) ? (total - recentN) : 0;
 
         if (requestedFullScan && recentN > 0) {
             for (let i = 0; i < startIdx; i++) {
                 allMes[i].querySelectorAll('.cii-img-block').forEach(block => {
                     const parent = block.parentNode;
-                    block.remove();
+                    removeImageBlock(block);
                     parent?.normalize?.();
                 });
                 allMes[i].querySelectorAll('.mes_text').forEach(el => processedHashes.delete(el));
@@ -1095,13 +1217,16 @@ async function processAllMessages() {
         }
         const messagesToProcess = requestedFullScan
             ? allMes.slice(startIdx)
-            : requestedDirtyMessages.filter(message => message?.isConnected && allMes.includes(message));
+            : requestedDirtyMessages.filter(message => {
+                if (!message?.isConnected || !chat?.contains(message)) return false;
+                return !messageIndexes || (messageIndexes.has(message) && messageIndexes.get(message) >= startIdx);
+            });
 
         if (!requestedFullScan && recentN > 0) {
             for (const message of requestedDirtyMessages) {
-                const index = allMes.indexOf(message);
-                if (index < 0 || index >= startIdx) continue;
-                message.querySelectorAll('.cii-img-block').forEach(block => block.remove());
+                const index = messageIndexes.get(message);
+                if (index === undefined || index >= startIdx) continue;
+                message.querySelectorAll('.cii-img-block').forEach(removeImageBlock);
                 message.querySelectorAll('.mes_text').forEach(el => processedHashes.delete(el));
             }
         }
@@ -1110,7 +1235,7 @@ async function processAllMessages() {
             if (!isAssistantMessageElement(message)) {
                 message.querySelectorAll('.cii-img-block').forEach(block => {
                     const parent = block.parentNode;
-                    block.remove();
+                    removeImageBlock(block);
                     parent?.normalize?.();
                 });
                 message.querySelectorAll('.mes_text').forEach(el => processedHashes.delete(el));
@@ -1122,7 +1247,7 @@ async function processAllMessages() {
             message.querySelectorAll('.cii-img-block').forEach(block => {
                 if (!block.closest('.mes_text')) {
                     const parent = block.parentNode;
-                    block.remove();
+                    removeImageBlock(block);
                     parent?.normalize?.();
                     removedOutsideBody = true;
                 }
@@ -1130,30 +1255,48 @@ async function processAllMessages() {
             textElements.forEach(el => {
                 if (removedOutsideBody) processedHashes.delete(el);
             });
-            for (const el of textElements) {
-                const fingerprint = getMessageFingerprint(el, matchableMessageText);
-                if (processedHashes.get(el) === fingerprint) continue;
+            const changedElements = textElements.map(el => ({
+                element: el,
+                fingerprint: getMessageFingerprint(el, matchableMessageText),
+            })).filter(item => processedHashes.get(item.element) !== item.fingerprint);
+            if (!changedElements.length) continue;
 
-                // Avoid opening image records and matching every rule when this
-                // message has already been processed with the same content.
-                await ensureUrlsForMatchingRules(matchableMessageText);
+            const sourceMatchMap = collectRuleMatchMap(matchableMessageText, s.rules);
+            const pinnedIds = new Set();
+            for (const rule of sourceMatchMap.keys()) {
+                const image = getRuleImages(rule)[0];
+                if (image?.imageId) pinnedIds.add(image.imageId);
+            }
+            pinnedIds.forEach(id => pendingImageUrlPins.add(id));
+            try {
+                await ensureUrlsForMatchingRules(Array.from(sourceMatchMap.keys()));
 
                 // A render may have replaced the message while image URLs were
                 // loading. Let the next debounced pass handle its latest text.
                 const latestMatchableText = getMatchableMessageText(message);
-                if (!el.isConnected || getMessageFingerprint(el, latestMatchableText) !== fingerprint) {
+                if (latestMatchableText !== matchableMessageText || !message.isConnected) {
                     pendingProcess = true;
                     continue;
                 }
-                const ownerMessage = el.closest('.mes');
-                if (ownerMessage) pluginMutationMessages.add(ownerMessage);
-                applyRulesToElement(el, matchableMessageText);
-                processedHashes.set(el, getMessageFingerprint(el, matchableMessageText));
-                if (ownerMessage) setTimeout(() => pluginMutationMessages.delete(ownerMessage), 0);
+
+                for (const { element: el, fingerprint } of changedElements) {
+                    if (!el.isConnected || getMessageFingerprint(el, latestMatchableText) !== fingerprint) {
+                        pendingProcess = true;
+                        continue;
+                    }
+                    const ownerMessage = el.closest('.mes');
+                    if (ownerMessage) pluginMutationMessages.add(ownerMessage);
+                    applyRulesToElement(el, matchableMessageText, sourceMatchMap);
+                    processedHashes.set(el, getMessageFingerprint(el, matchableMessageText));
+                    if (ownerMessage) setTimeout(() => pluginMutationMessages.delete(ownerMessage), 0);
+                }
+            } finally {
+                pinnedIds.forEach(id => pendingImageUrlPins.delete(id));
             }
         }
     } finally {
         processing = false;
+        scheduleImageUrlCachePrune();
         if (pendingProcess) { pendingProcess = false; processAllMessages(); }
     }
 }
@@ -1170,7 +1313,7 @@ function scheduleProcess(messages = null) {
             if (message) dirtyMessages.add(message);
         }
     }
-    if (switchLock || compressing) { pendingProcess = true; return; }
+    if (compressing) { pendingProcess = true; return; }
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => processAllMessages(), 120);
 }
@@ -1187,6 +1330,7 @@ function startObserver() {
         const pluginMessages = new Set();
         let needsFullScan = false;
         for (const record of records) {
+            for (const node of record.removedNodes) unobserveRemovedMessageBodies(node);
             const target = record.target.nodeType === Node.ELEMENT_NODE
                 ? record.target
                 : record.target.parentElement;
@@ -1303,8 +1447,6 @@ async function handleUpload(files, $rule) {
 
         const imageId = uid('img_');
         await putImage(imageId, blob, { name: file.name, type: blob.type });
-        const url = URL.createObjectURL(blob);
-        urlCache.set(imageId, url);
         rule.images.push({ imageId, imageType: blob.type });
     }
 
@@ -1473,6 +1615,7 @@ async function refreshPreview($rule, rule) {
         `);
         $addBtn.before($item);
         const imageElement = $item.find('img')[0];
+        imageElement.dataset.ciiImageId = img.imageId || '';
         const existingUrl = getImageUrlOfItem(img);
         if (existingUrl) imageElement.src = existingUrl;
         else if (img.imageId) observePreviewImage(imageElement, img.imageId);
