@@ -1740,7 +1740,7 @@ function buildSettingsHtml() {
         <div id="cii-settings" class="cii-settings">
             <div class="inline-drawer">
                 <div class="inline-drawer-toggle inline-drawer-header">
-                    <b><i class="fa-solid fa-wand-magic-sparkles cii-accent-icon"></i> 正文插图</b>
+                    <b><i class="fa-solid fa-wand-magic-sparkles cii-accent-icon"></i> <span class="cii-title-text">正文插图</span></b>
                     <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
                 </div>
                 <div class="inline-drawer-content">
@@ -2274,6 +2274,21 @@ function injectStyles() {
             opacity: 0.75;
             margin-left: 6px;
             letter-spacing: 0.3px;
+        }
+        .cii-settings .cii-title-text {
+            display: inline-block;
+            font-weight: 800;
+            background: linear-gradient(105deg, #ed6ca9 0%, #ffd8e9 26%, #f27db6 48%, #fff0f7 58%, #e96aa9 76%, #ffb7d5 100%);
+            background-size: 240% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            filter: drop-shadow(0 1px 3px rgba(240, 107, 168, .38));
+            animation: cii-title-shimmer 4s ease-in-out infinite;
+        }
+        @keyframes cii-title-shimmer {
+            0%, 100% { background-position: 100% 50%; }
+            50% { background-position: 0% 50%; }
         }
         .cii-settings .cii-card {
             background: linear-gradient(135deg,
