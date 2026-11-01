@@ -36,8 +36,9 @@ const COMPRESS_PRESETS = [
 ];
 
 const DB_NAME = 'cii-images-db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const STORE = 'images';
+const META_STORE = 'image_metadata';
 
 let processedHashes = new WeakMap();
 let observer = null;
@@ -213,11 +214,30 @@ function openDb() {
     if (dbPromise) return dbPromise;
     dbPromise = new Promise((resolve, reject) => {
         const req = indexedDB.open(DB_NAME, DB_VERSION);
-        req.onupgradeneeded = () => {
+        req.onupgradeneeded = event => {
             const db = req.result;
             if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
-            if (db.objectStoreNames.contains('meta')) {
-                try { db.deleteObjectStore('meta'); } catch { /* ignore */ }
+            if (!db.objectStoreNames.contains(META_STORE)) {
+                db.createObjectStore(META_STORE);
+            }
+            // 从旧版图片记录中复制轻量元数据，保留原 Blob，不重写图片数据。
+            if (event.oldVersion > 0 && event.oldVersion < 4) {
+                const tx = req.transaction;
+                const images = tx.objectStore(STORE);
+                const metadata = tx.objectStore(META_STORE);
+                const cursorRequest = images.openCursor();
+                cursorRequest.onsuccess = e => {
+                    const cursor = e.target.result;
+                    if (!cursor) return;
+                    const record = cursor.value || {};
+                    const blob = record.blob;
+                    metadata.put({
+                        ...(record.meta && typeof record.meta === 'object' ? record.meta : {}),
+                        size: typeof blob?.size === 'number' ? blob.size : 0,
+                        type: blob?.type || record.meta?.type || '',
+                    }, cursor.primaryKey);
+                    cursor.continue();
+                };
             }
         };
         req.onsuccess = () => resolve(req.result);
@@ -229,10 +249,16 @@ function openDb() {
 async function putImage(id, blob, meta = {}) {
     const db = await openDb();
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE, 'readwrite');
+        const tx = db.transaction([STORE, META_STORE], 'readwrite');
         tx.objectStore(STORE).put({ blob, meta }, id);
+        tx.objectStore(META_STORE).put({
+            ...meta,
+            size: blob?.size || 0,
+            type: blob?.type || meta.type || '',
+        }, id);
         tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error('图片写入失败'));
+        tx.onerror = () => reject(tx.error || new Error('图片写入失败'));
     });
 }
 
@@ -249,8 +275,9 @@ async function getImage(id) {
 async function deleteImage(id) {
     const db = await openDb();
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE, 'readwrite');
+        const tx = db.transaction([STORE, META_STORE], 'readwrite');
         tx.objectStore(STORE).delete(id);
+        tx.objectStore(META_STORE).delete(id);
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
     });
@@ -259,8 +286,9 @@ async function deleteImage(id) {
 async function clearAllImagesFromDb() {
     const db = await openDb();
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE, 'readwrite');
+        const tx = db.transaction([STORE, META_STORE], 'readwrite');
         tx.objectStore(STORE).clear();
+        tx.objectStore(META_STORE).clear();
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
     });
@@ -269,15 +297,15 @@ async function clearAllImagesFromDb() {
 async function getStorageStats() {
     const db = await openDb();
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE, 'readonly');
-        const req = tx.objectStore(STORE).openCursor();
+        const tx = db.transaction(META_STORE, 'readonly');
+        const req = tx.objectStore(META_STORE).openCursor();
         let count = 0, bytes = 0;
         req.onsuccess = e => {
             const cursor = e.target.result;
             if (cursor) {
                 count++;
-                const blob = cursor.value?.blob;
-                if (blob && typeof blob.size === 'number') bytes += blob.size;
+                const size = cursor.value?.size;
+                if (typeof size === 'number') bytes += size;
                 cursor.continue();
             } else resolve({ count, bytes });
         };
@@ -1459,10 +1487,34 @@ async function refreshStats() {
         $('#cii-stat-count').text(count);
         $('#cii-stat-size').text(formatBytes(bytes));
         $('#cii-clear-all').prop('disabled', count === 0).toggleClass('cii-disabled', count === 0);
+        const quota = await getBrowserStorageEstimate();
+        const $quota = $('#cii-stat-quota');
+        if (quota) {
+            const percent = quota.quota > 0 ? Math.min(100, Math.round(quota.usage / quota.quota * 100)) : 0;
+            $quota.text(`${formatBytes(quota.usage)} / ${formatBytes(quota.quota)}（${percent}%）`);
+            $quota.attr('title', `浏览器报告的当前来源存储估算：已用 ${formatBytes(quota.usage)}，配额 ${formatBytes(quota.quota)}。包含本扩展以外的数据。`);
+            $quota.toggleClass('cii-quota-warning', percent >= 85);
+        } else {
+            $quota.text('浏览器暂不支持配额估算');
+            $quota.removeAttr('title').removeClass('cii-quota-warning');
+        }
     } catch (e) {
         console.warn('[CII] 统计失败', e);
         $('#cii-stat-count').text('?');
         $('#cii-stat-size').text('?');
+        $('#cii-stat-quota').text('暂时无法读取').removeAttr('title');
+    }
+}
+
+async function getBrowserStorageEstimate() {
+    try {
+        if (!navigator.storage || typeof navigator.storage.estimate !== 'function') return null;
+        const estimate = await navigator.storage.estimate();
+        if (!Number.isFinite(estimate?.usage) || !Number.isFinite(estimate?.quota) || estimate.quota <= 0) return null;
+        return { usage: estimate.usage, quota: estimate.quota };
+    } catch (e) {
+        console.warn('[CII] 读取浏览器配额失败', e);
+        return null;
     }
 }
 
@@ -1997,13 +2049,17 @@ function buildSettingsHtml() {
                                 <span class="cii-stat-value" id="cii-stat-size">0 B</span>
                                 <span class="cii-stat-label">占用空间</span>
                             </div>
+                            <div class="cii-stat">
+                                <span class="cii-stat-value" id="cii-stat-quota">读取中…</span>
+                                <span class="cii-stat-label">浏览器已用 / 配额</span>
+                            </div>
                             <div class="cii-spacer"></div>
                             <button type="button" class="cii-btn cii-btn-danger cii-disabled" id="cii-clear-all">
                                 <i class="fa-solid fa-trash-can"></i>
                                 <span>清除全部图片</span>
                             </button>
                         </div>
-                        <div class="cii-dim cii-tiny">图片存在浏览器本地，卸载或清理数据会丢失，建议保留原图备份～</div>
+                        <div class="cii-dim cii-tiny">配额是浏览器对当前网站来源的估算，可能包含其他扩展或酒馆数据；接近上限时请先导出备份，再手动清理图片。</div>
                     </div>
 
                     <div class="cii-card">
@@ -2656,6 +2712,11 @@ function injectStyles() {
             background-clip: text;
             color: transparent;
             letter-spacing: 0.3px;
+        }
+        .cii-settings .cii-stat-value.cii-quota-warning {
+            background: linear-gradient(135deg, #ff8b78, #d94b63);
+            -webkit-background-clip: text;
+            background-clip: text;
         }
         .cii-settings .cii-stat-label { font-size: 0.78em; color: var(--cii-text-dim); }
         .cii-settings .cii-dim { color: var(--cii-text-dim); }
