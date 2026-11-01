@@ -1740,7 +1740,7 @@ function buildSettingsHtml() {
         <div id="cii-settings" class="cii-settings">
             <div class="inline-drawer">
                 <div class="inline-drawer-toggle inline-drawer-header">
-                    <b><i class="fa-solid fa-wand-magic-sparkles cii-accent-icon"></i> 正文插图</b>
+                    <b><i class="fa-solid fa-wand-magic-sparkles cii-accent-icon"></i> <span class="cii-title-text">正文插图</span></b>
                     <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
                 </div>
                 <div class="inline-drawer-content">
@@ -2275,6 +2275,17 @@ function injectStyles() {
             margin-left: 6px;
             letter-spacing: 0.3px;
         }
+        #cii-settings .cii-title-text {
+            display: inline-block;
+            font-weight: 800;
+            font-size: 1.18em;
+            background: linear-gradient(135deg, #ffb7d5 0%, #c4a7ff 100%) !important;
+            -webkit-background-clip: text !important;
+            background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+            color: transparent !important;
+            letter-spacing: 0.3px;
+        }
         .cii-settings .cii-card {
             background: linear-gradient(135deg,
                 var(--cii-card-bg) 0%,
@@ -2777,28 +2788,192 @@ function injectStyles() {
 
         .cii-settings .cii-rule.cii-uploading { opacity: 0.55; pointer-events: none; }
 
-        /* ============ 扩展状态栏排版：只调整对齐与留白 ============ */
+        /* ============ 插件设置面板：轻柔的画册风格 ============ */
         #cii-settings .inline-drawer-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            min-height: 42px;
-            padding: 8px 12px;
+            min-height: 48px;
+            padding: 10px 14px;
+            border: 1px solid var(--cii-border);
+            border-radius: 16px;
+            background: linear-gradient(110deg, rgba(255, 183, 213, 0.15), rgba(196, 167, 255, 0.12));
+            box-shadow: 0 4px 18px rgba(160, 120, 170, 0.10), inset 0 1px rgba(255,255,255,.35);
         }
-        #cii-settings .inline-drawer-header > b {
+        #cii-settings .inline-drawer-header b {
+            font-size: 1.03em;
+            letter-spacing: .35px;
+        }
+        #cii-settings .cii-en-title {
+            font-weight: 500;
+            letter-spacing: .55px;
+        }
+        #cii-settings .inline-drawer-content { padding-top: 6px; }
+        #cii-settings .cii-card {
+            padding: 15px 16px;
+            margin: 12px 0;
+            border-width: 1px;
+            border-radius: 16px;
+            box-shadow: 0 5px 18px rgba(120, 90, 130, .07), inset 0 1px rgba(255,255,255,.22);
+            transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+        }
+        #cii-settings .cii-card:hover {
+            border-color: var(--cii-border-hover);
+            box-shadow: 0 8px 24px rgba(170, 110, 155, .11), inset 0 1px rgba(255,255,255,.28);
+        }
+        #cii-settings .cii-card-title {
+            gap: 9px;
+            margin-bottom: 13px;
+            padding-bottom: 9px;
+            border-bottom: 1px solid rgba(255, 183, 213, .18);
+            font-size: .98em;
+        }
+        #cii-settings .cii-emoji {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            min-width: 0;
-            margin: 0;
-            line-height: 1.3;
+            justify-content: center;
+            width: 27px;
+            height: 27px;
+            border-radius: 9px;
+            background: linear-gradient(140deg, rgba(255,183,213,.24), rgba(196,167,255,.2));
+            filter: none;
         }
-        #cii-settings .inline-drawer-header .inline-drawer-icon {
-            flex: 0 0 auto;
-            margin-left: auto;
+        #cii-settings .cii-row { gap: 10px; }
+        #cii-settings .cii-inline-label { font-size: .84em; }
+        #cii-settings .cii-num { min-height: 34px; text-align: center; }
+        #cii-settings textarea.text_pole { line-height: 1.55; padding: 8px 10px; }
+        #cii-settings .cii-btn {
+            min-height: 36px;
+            padding: 8px 14px;
+            border-width: 1px;
+            border-radius: 10px;
+            font-weight: 600;
+            letter-spacing: .1px;
         }
-        #cii-settings .inline-drawer-header .cii-accent-icon { margin-right: 0; }
+        #cii-settings .cii-btn-primary {
+            background: linear-gradient(120deg, #f29abe 0%, #b99bea 100%);
+            box-shadow: 0 4px 12px rgba(205, 130, 180, .22);
+        }
+        #cii-settings .cii-btn-primary:hover { box-shadow: 0 6px 16px rgba(205, 130, 180, .32); }
+        #cii-settings .cii-stat-row { gap: 10px; }
+        #cii-settings .cii-stat {
+            min-width: 105px;
+            padding: 9px 13px;
+            border: 1px solid rgba(255, 183, 213, .24);
+            border-radius: 12px;
+            background: linear-gradient(135deg, rgba(255,183,213,.09), rgba(196,167,255,.08));
+        }
+        #cii-settings .cii-stat-value { font-size: 1.18em; }
+        #cii-settings .cii-tiny { margin-top: 9px; line-height: 1.65; }
+        #cii-settings .cii-card-rules { padding-bottom: 14px; }
+        #cii-settings .cii-rule, #cii-settings .cii-group { border-width: 1px; }
+        #cii-settings .cii-rule { border-radius: 12px; }
+        #cii-settings .cii-rule-head { min-height: 45px; padding: 8px 11px; }
+        #cii-settings .cii-rule-body { padding: 10px 12px 12px; }
+        #cii-settings .cii-image-item, #cii-settings .cii-image-add {
+            width: 78px;
+            height: 78px;
+            border-radius: 12px;
+        }
+        #cii-settings .cii-image-item { box-shadow: 0 2px 8px rgba(35, 20, 40, .10); }
+        #cii-settings .cii-image-add { background: linear-gradient(145deg, rgba(255,183,213,.08), rgba(196,167,255,.08)); }
+        #cii-settings .cii-actions-row { gap: 10px; margin-top: 12px; }
+        @media (max-width: 640px) {
+            #cii-settings .cii-card { padding: 12px; }
+            #cii-settings .cii-spacer { display: none; }
+            #cii-settings .cii-stat-row { gap: 8px; }
+            #cii-settings .cii-stat { min-width: 88px; flex: 1; }
+            #cii-settings .cii-actions-row { flex-direction: column; }
+            #cii-settings .cii-btn { justify-content: center; }
+            #cii-settings .cii-tiny-inline { display: none; }
+        }
+
+        /* 画册感细节：柔纸色、低对比描边与照片展示框 */
+        #cii-settings .cii-card {
+            background:
+                radial-gradient(ellipse at 0% 0%, rgba(255, 213, 231, .32), transparent 55%),
+                linear-gradient(145deg, rgba(255, 240, 247, .55), rgba(239, 232, 251, .48)),
+                var(--cii-card-bg);
+            border: 1px solid rgba(219, 164, 197, .58);
+            border-left: 3px solid rgba(220, 153, 190, .78);
+            box-shadow: 0 8px 24px rgba(124, 88, 125, .12), inset 0 1px 0 rgba(255,255,255,.58);
+        }
+        #cii-settings.cii-theme-light .cii-card {
+            background:
+                radial-gradient(ellipse at 0% 0%, rgba(255, 220, 235, .28), transparent 52%),
+                linear-gradient(145deg, rgba(255,255,255,.98), rgba(250,246,253,.96));
+            border-color: rgba(225, 183, 207, .48);
+            box-shadow: 0 8px 24px rgba(147, 110, 137, .09), inset 0 1px 0 #fff;
+        }
+        #cii-settings.cii-theme-dark .cii-card {
+            background:
+                radial-gradient(ellipse at 0% 0%, rgba(255, 183, 213, .09), transparent 52%),
+                linear-gradient(145deg, rgba(43, 35, 55, .97), rgba(35, 30, 48, .96));
+            border-color: rgba(211, 166, 206, .28);
+            box-shadow: 0 8px 24px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.06);
+        }
+        #cii-settings .cii-card-title {
+            color: var(--cii-text);
+            border-bottom-color: rgba(219, 173, 205, .24);
+        }
+        #cii-settings .cii-emoji {
+            border: 1px solid rgba(222, 180, 211, .25);
+            background: linear-gradient(145deg, rgba(255, 231, 241, .58), rgba(235, 226, 251, .58));
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.65);
+        }
+        #cii-settings .cii-group {
+            border-color: rgba(220, 174, 205, .56);
+            background: linear-gradient(145deg, rgba(255, 239, 247, .58), rgba(242, 235, 251, .48));
+        }
+        #cii-settings.cii-theme-dark .cii-group {
+            background: linear-gradient(145deg, rgba(255, 183, 213, .055), rgba(196, 167, 255, .045));
+        }
+        #cii-settings .cii-group-head {
+            background: linear-gradient(105deg, rgba(255, 221, 235, .7), rgba(236, 224, 250, .62));
+        }
+        #cii-settings .cii-group-head:hover {
+            background: linear-gradient(105deg, rgba(255, 221, 235, .52), rgba(236, 224, 250, .48));
+        }
+        #cii-settings .cii-rule {
+            border-color: rgba(222, 179, 209, .58);
+            background: linear-gradient(145deg, rgba(255, 246, 250, .72), rgba(245, 239, 252, .62));
+            box-shadow: 0 3px 10px rgba(124, 88, 125, .07), inset 0 1px 0 rgba(255,255,255,.72);
+        }
+        #cii-settings.cii-theme-dark .cii-rule {
+            background: linear-gradient(145deg, rgba(255, 255, 255, .045), rgba(196, 167, 255, .035));
+        }
+        #cii-settings .cii-rule-head { padding: 9px 12px; }
+        #cii-settings .cii-rule-body { border-top-color: rgba(222, 179, 209, .32); }
+        #cii-settings .cii-image-item {
+            padding: 4px;
+            border: 2px solid rgba(255,255,255,.96);
+            background: linear-gradient(145deg, #fff, #f3e5ef);
+            box-shadow: 0 4px 13px rgba(85, 57, 84, .18), 0 0 0 1px rgba(221, 174, 205, .58);
+        }
+        #cii-settings .cii-image-item img { border-radius: 9px; }
+        #cii-settings .cii-image-add {
+            border-color: rgba(215, 163, 199, .58);
+            color: #b67ca5;
+            background: linear-gradient(145deg, rgba(255, 239, 246, .68), rgba(244, 237, 252, .68));
+        }
+        #cii-settings .cii-stat {
+            background: linear-gradient(145deg, rgba(255, 242, 248, .63), rgba(244, 239, 252, .58));
+            border-color: rgba(225, 179, 207, .32);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.72);
+        }
+        #cii-settings.cii-theme-dark .cii-stat {
+            background: linear-gradient(145deg, rgba(255, 183, 213, .09), rgba(196, 167, 255, .08));
+        }
+        #cii-settings .cii-btn { box-shadow: 0 2px 7px rgba(120, 85, 120, .055); }
+        #cii-settings .cii-btn-primary {
+            background: linear-gradient(125deg, #eaa2c0, #b7a0dc);
+            border-color: rgba(255,255,255,.38);
+            box-shadow: 0 4px 12px rgba(181, 132, 174, .2);
+        }
+        #cii-settings .cii-btn-secondary { background: rgba(255,255,255,.16); }
+        #cii-settings .cii-btn-add { background: linear-gradient(135deg, rgba(255,240,247,.34), rgba(246,240,253,.3)); }
+        #cii-settings .text_pole,
+        #cii-settings select.text_pole {
+            box-shadow: inset 0 1px 2px rgba(75, 50, 75, .035);
+        }
+        #cii-settings .cii-tiny { max-width: 78ch; }
 
         /* ============ 聊天里插入的图片（支持多图切换） ============ */
         .cii-img-block {
