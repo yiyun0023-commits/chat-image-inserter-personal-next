@@ -2275,14 +2275,15 @@ function injectStyles() {
             margin-left: 6px;
             letter-spacing: 0.3px;
         }
-        .cii-settings .cii-title-text {
+        #cii-settings .cii-title-text {
             display: inline-block;
             font-weight: 800;
             font-size: 1.18em;
-            background: linear-gradient(135deg, #ffb7d5, #c4a7ff);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
+            background: linear-gradient(135deg, #ffb7d5 0%, #c4a7ff 100%) !important;
+            -webkit-background-clip: text !important;
+            background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+            color: transparent !important;
             letter-spacing: 0.3px;
         }
         .cii-settings .cii-card {
